@@ -4,41 +4,66 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import optimize
 
+
+# Define a sigmoid function to fit the temperature data to
 def fit_func(x, a, b, c, d):
+    # a: vertical offset
+    # b: max value
+    # c: growth factor
+    # d: s-curve mid-point
     return (a+b/(1+np.exp(-c*(x-d))))
-
-
+    
+# load city data into dataframe
 city_data = pd.read_csv('city_data.csv')
-city_data['rolling_avg'] = city_data['avg_temp'].rolling(window=15).mean()
+
+# drop rows with empty values
 city_data = city_data.dropna()
+
+# add rolling average dataframe with window of 15 years
+city_data['rolling_avg'] = city_data['avg_temp'].rolling(window=15).mean()
+
+# define local temperature input/output datasets
 x1 = city_data['year'].values
 y1 = city_data['rolling_avg'].values
 
+# load global data into dataframe
 global_data = pd.read_csv('global_data.csv')
-global_data['rolling_avg'] = global_data['avg_temp'].rolling(window=15).mean()
+
+# drop rows with empty values
 global_data = global_data.dropna()
+
+# add rolling average dataframe with window of 15 years
+global_data['rolling_avg'] = global_data['avg_temp'].rolling(window=15).mean()
+
+# define global temperature input/ouput datasets
 x2 = global_data['year'].values
 y2 = global_data['rolling_avg'].values
 
+# fit local and global datasets to sigmoid curve with set of beginning guesses as defined
 popt1, pcov1 = optimize.curve_fit(fit_func, x1, y1, p0=[5,10,0.001,1800])
 popt2, pcov2 = optimize.curve_fit(fit_func, x2, y2, p0=[5,10,0.001,1800])
-print(popt1, popt2)
 
-fig, axs = plt.subplots(2,1,figsize=(20,10))
+# inner join the datasets where yearly temperature data is available for both
+result = pd.merge(city_data, global_data, how='inner', on='year', suffixes=('_local','_global'))
+# determine correlation coefficent of merged dataset
+corr_coef = np.corrcoef(result['rolling_avg_local'].values, result['rolling_avg_global'].values, rowvar=False)
 
-axs[0].plot(x1, y1, 'g-')
-axs[0].plot(range(x1[0],2050,1), fit_func(range(x1[0],2050,1), *popt1), 'y--')
-axs[0].set_xlim(1800,2025)
-axs[0].set_ylim(None,13)
+plt.figure(figsize=(20,10))
+# plot raw data in blue
+plt.plot(x1, y1, 'b-',label="Philadelphia")
+# plot fit data in cyan; extend projection into future
+plt.plot(range(x1[0],2050,1), fit_func(range(x1[0],2050,1), *popt1), 'c--',label="Phila. Sigmoid Fit")
 
-axs[1].plot(x2, y2, 'g-')
-axs[1].plot(range(x2[0],2050,1), fit_func(range(x2[0],2050,1), *popt2), 'y--')
-axs[1].set_xlim(1800,2025)
-axs[1].set_ylim(None,13)
+# plot raw data in red
+plt.plot(x2, y2, 'r-',label="Global")
+# plot fit data in yellow; extend projection into future
+plt.plot(range(x2[0],2050,1), fit_func(range(x2[0],2050,1), *popt2), 'y--',label="Global Sigmoid Fit")
+plt.legend(fontsize=12)
 
-axs[0].set_ylabel('Temp. (Celsius)')
-axs[1].set_ylabel('Temp. (Celsius)')
-axs[1].set_xlabel('Year')
+plt.ylabel('Temp. (Celsius)')
+plt.xlabel('Year')
 
-fig.suptitle('Temperature (Rolling Average) by Year')
+plt.suptitle('Temperature by Year (Rolling Average, Window = 15 years)',fontsize=24)
 plt.show
+
+print('\nThe correlation coefficient is: %.2f' % corr_coef[0][1])
