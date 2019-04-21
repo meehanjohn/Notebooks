@@ -12,15 +12,18 @@ def fit_func(x, a, b, c, d):
     # c: growth factor
     # d: s-curve mid-point
     return (a+b/(1+np.exp(-c*(x-d))))
+
+# define rolling average window size
+rolling_window = 25
     
 # load city data into dataframe
 city_data = pd.read_csv('city_data.csv')
 
+# add rolling average dataframe with the pre-defined window size
+city_data['rolling_avg'] = city_data['avg_temp'].rolling(window=rolling_window).mean()
+
 # drop rows with empty values
 city_data = city_data.dropna()
-
-# add rolling average dataframe with window of 15 years
-city_data['rolling_avg'] = city_data['avg_temp'].rolling(window=15).mean()
 
 # define local temperature input/output datasets
 x1 = city_data['year'].values
@@ -29,11 +32,11 @@ y1 = city_data['rolling_avg'].values
 # load global data into dataframe
 global_data = pd.read_csv('global_data.csv')
 
+# add rolling average dataframe with the pre-defined window size
+global_data['rolling_avg'] = global_data['avg_temp'].rolling(window=rolling_window).mean()
+
 # drop rows with empty values
 global_data = global_data.dropna()
-
-# add rolling average dataframe with window of 15 years
-global_data['rolling_avg'] = global_data['avg_temp'].rolling(window=15).mean()
 
 # define global temperature input/ouput datasets
 x2 = global_data['year'].values
@@ -49,21 +52,20 @@ result = pd.merge(city_data, global_data, how='inner', on='year', suffixes=('_lo
 corr_coef = np.corrcoef(result['rolling_avg_local'].values, result['rolling_avg_global'].values, rowvar=False)
 
 plt.figure(figsize=(20,10))
-# plot raw data in blue
+
+# plot local raw data in blue
 plt.plot(x1, y1, 'b-',label="Philadelphia")
 # plot fit data in cyan; extend projection into future
-plt.plot(range(x1[0],2050,1), fit_func(range(x1[0],2050,1), *popt1), 'c--',label="Phila. Sigmoid Fit")
+plt.plot(range(x1[0],2100,1), fit_func(range(x1[0],2100,1), *popt1), 'c--',label="Phila. Sigmoid Fit")
 
-# plot raw data in red
+# plot global raw data in red
 plt.plot(x2, y2, 'r-',label="Global")
 # plot fit data in yellow; extend projection into future
-plt.plot(range(x2[0],2050,1), fit_func(range(x2[0],2050,1), *popt2), 'y--',label="Global Sigmoid Fit")
+plt.plot(range(x2[0],2100,1), fit_func(range(x2[0],2100,1), *popt2), 'y--',label="Global Sigmoid Fit")
 plt.legend(fontsize=12)
 
 plt.ylabel('Temp. (Celsius)')
 plt.xlabel('Year')
 
-plt.suptitle('Temperature by Year (Rolling Average, Window = 15 years)',fontsize=24)
+plt.suptitle('Temperature by Year (Rolling Average, Window = {} years)'.format(rolling_window),fontsize=24)
 plt.show
-
-print('\nThe correlation coefficient is: %.2f' % corr_coef[0][1])
